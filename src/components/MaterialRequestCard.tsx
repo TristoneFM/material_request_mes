@@ -27,18 +27,40 @@ interface MaterialRequestCardProps {
   request: MaterialRequest;
 }
 
+// Get current time in GMT-6
+const getGMT6Time = () => {
+  const now = new Date();
+  // Get UTC time and subtract 6 hours for GMT-6
+  const gmt6Offset = -6 * 60; // GMT-6 in minutes
+  const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+  return utcTime + gmt6Offset * 60000;
+};
+
+// Parse request time assuming it's stored in GMT-6
+const parseRequestTimeGMT6 = (requestTime: string) => {
+  const date = new Date(requestTime);
+  // If the date string doesn't include timezone info, treat it as GMT-6
+  // Otherwise, convert to GMT-6
+  const utcTime = date.getTime() + date.getTimezoneOffset() * 60000;
+  const gmt6Offset = -6 * 60;
+  return utcTime + gmt6Offset * 60000;
+};
+
 export default function MaterialRequestCard({ request }: MaterialRequestCardProps) {
   const [elapsed, setElapsed] = useState("");
+  const [diffMinutes, setDiffMinutes] = useState(0);
 
   useEffect(() => {
     const calculateElapsed = () => {
-      const now = new Date().getTime();
-      const requestDate = new Date(request.requestTime).getTime();
-      const diff = now - requestDate;
+      const nowGMT6 = getGMT6Time();
+      const requestGMT6 = parseRequestTimeGMT6(request.requestTime);
+      const diff = nowGMT6 - requestGMT6;
 
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setDiffMinutes(diff / (1000 * 60));
 
       if (hours > 0) {
         setElapsed(`${hours}h ${minutes}m ${seconds}s`);
@@ -56,10 +78,6 @@ export default function MaterialRequestCard({ request }: MaterialRequestCardProp
 
   // Color based on elapsed time (green < 5min, yellow < 15min, red > 15min)
   const getTimerColor = () => {
-    const now = new Date().getTime();
-    const requestDate = new Date(request.requestTime).getTime();
-    const diffMinutes = (now - requestDate) / (1000 * 60);
-    
     if (diffMinutes < 5) return "success.main";
     if (diffMinutes < 15) return "warning.main";
     return "error.main";
