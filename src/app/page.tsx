@@ -202,7 +202,7 @@ export default function Home() {
                 </Box>
                 <Grid container spacing={2}>
                   {areaRequests.map((request) => (
-                    <Grid size={{ xs: 6, sm: 4, md: 3, lg: 2, xl: 1.5 }} key={request._id}>
+                    <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3, xl: 2.4 }} key={request._id}>
                       <MaterialRequestCard request={request} />
                     </Grid>
                   ))}

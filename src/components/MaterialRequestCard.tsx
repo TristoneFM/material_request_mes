@@ -7,7 +7,7 @@ import {
   Typography,
   Box,
 } from "@mui/material";
-import { Timer, Inventory, LocationOn } from "@mui/icons-material";
+import { Timer, Inventory, LocationOn, Label } from "@mui/icons-material";
 
 interface MaterialRequest {
   _id: string;
@@ -27,34 +27,71 @@ interface MaterialRequestCardProps {
   request: MaterialRequest;
 }
 
-// Get current time in GMT-6
-const getGMT6Time = () => {
-  const now = new Date();
-  // Get UTC time and subtract 6 hours for GMT-6
-  const gmt6Offset = -6 * 60; // GMT-6 in minutes
-  const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
-  return utcTime + gmt6Offset * 60000;
-};
+// Parse an ISO string that is stored with +00:00 but actually represents a GMT-6 local time.
+// We ignore the provided offset and convert the naive local time to the correct UTC epoch.
+const parseRequestTimeAssumingGMT6 = (requestTime: string): number => {
+  const match = requestTime.match(
+    /(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?/
+  );
 
-// Parse request time assuming it's stored in GMT-6
-const parseRequestTimeGMT6 = (requestTime: string) => {
-  const date = new Date(requestTime);
-  // If the date string doesn't include timezone info, treat it as GMT-6
-  // Otherwise, convert to GMT-6
-  const utcTime = date.getTime() + date.getTimezoneOffset() * 60000;
-  const gmt6Offset = -6 * 60;
-  return utcTime + gmt6Offset * 60000;
+  if (!match) {
+    // Fallback: let Date parse it, best-effort
+    return new Date(requestTime).getTime();
+  }
+
+  const [
+    ,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    milli = "0",
+  ] = match;
+
+  const y = Number(year);
+  const m = Number(month) - 1; // Date.UTC expects 0-based month
+  const d = Number(day);
+  const h = Number(hour);
+  const min = Number(minute);
+  const s = Number(second);
+  const ms = Number(milli);
+
+  // The stored time is intended to be GMT-6 local. Convert that local time to UTC by adding 6 hours.
+  return Date.UTC(y, m, d, h + 6, min, s, ms);
 };
 
 export default function MaterialRequestCard({ request }: MaterialRequestCardProps) {
   const [elapsed, setElapsed] = useState("");
   const [diffMinutes, setDiffMinutes] = useState(0);
+  const [custPart, setCustPart] = useState<string | null>(null);
+  const [custPartLoading, setCustPartLoading] = useState(true);
+
+  // Fetch customer part from MySQL
+  useEffect(() => {
+    const fetchCustPart = async () => {
+      try {
+        const response = await fetch(`/api/customer-part?sap=${request.sapMaterial}`);
+        const data = await response.json();
+        setCustPart(data.custPart);
+      } catch (error) {
+        console.error("Error fetching customer part:", error);
+        setCustPart(null);
+      } finally {
+        setCustPartLoading(false);
+      }
+    };
+    fetchCustPart();
+  }, [request.sapMaterial]);
 
   useEffect(() => {
     const calculateElapsed = () => {
-      const nowGMT6 = getGMT6Time();
-      const requestGMT6 = parseRequestTimeGMT6(request.requestTime);
-      const diff = nowGMT6 - requestGMT6;
+      // Current time in UTC (millis)
+      const nowUtc = Date.now();
+      // Request time interpreted as GMT-6 local, converted to UTC millis
+      const requestUtc = parseRequestTimeAssumingGMT6(request.requestTime);
+      const diff = nowUtc - requestUtc;
 
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -99,10 +136,30 @@ export default function MaterialRequestCard({ request }: MaterialRequestCardProp
           {request.stationName}
         </Typography>
 
-        {/* SAP Material */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 1 }}>
-          <Inventory sx={{ fontSize: 16, color: "primary.main" }} />
-          <Typography variant="body2" fontWeight="medium">
+        {/* Customer Part - Orange background */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            mt: 1,
+            bgcolor: custPart ? "#ff9800" : "grey.400",
+            color: "white",
+            px: 1,
+            py: 0.5,
+            borderRadius: 1,
+          }}
+        >
+          <Label sx={{ fontSize: 18 }} />
+          <Typography variant="body1" fontWeight="bold">
+            {custPartLoading ? "..." : (custPart || "No encontrado")}
+          </Typography>
+        </Box>
+
+        {/* SAP Material - Bold text only */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+          <Inventory sx={{ fontSize: 18, color: "primary.main" }} />
+          <Typography variant="body1" fontWeight="bold">
             {request.sapMaterial}
           </Typography>
         </Box>
