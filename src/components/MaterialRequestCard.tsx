@@ -7,7 +7,8 @@ import {
   Typography,
   Box,
 } from "@mui/material";
-import { Timer, Inventory, LocationOn, Label } from "@mui/icons-material";
+import { Timer, Inventory, LocationOn, Label, Place } from "@mui/icons-material";
+import Chip from "@mui/material/Chip";
 
 interface MaterialRequest {
   _id: string;
@@ -67,6 +68,8 @@ export default function MaterialRequestCard({ request }: MaterialRequestCardProp
   const [diffMinutes, setDiffMinutes] = useState(0);
   const [custPart, setCustPart] = useState<string | null>(null);
   const [custPartLoading, setCustPartLoading] = useState(true);
+  const [ubicaciones, setUbicaciones] = useState<string[]>([]);
+  const [ubicacionesLoading, setUbicacionesLoading] = useState(true);
 
   // Fetch customer part from MySQL
   useEffect(() => {
@@ -83,6 +86,44 @@ export default function MaterialRequestCard({ request }: MaterialRequestCardProp
       }
     };
     fetchCustPart();
+  }, [request.sapMaterial]);
+
+  // Fetch ubicaciones data
+  useEffect(() => {
+    const fetchUbicaciones = async () => {
+      try {
+        const response = await fetch('/api/ubicaciones', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ sapMaterial: request.sapMaterial }),
+        });
+        const data = await response.json();
+        console.log('Ubicaciones for', request.sapMaterial, ':', data);
+        
+        // Extract all LGPLA values from the response
+        if (Array.isArray(data)) {
+          const lgplaValues = data
+            .map((item: { LGPLA?: string }) => item.LGPLA)
+            .filter((val): val is string => Boolean(val));
+          setUbicaciones(lgplaValues);
+        } else if (data && typeof data === 'object') {
+          // If single object or has a data property
+          const items = data.data || [data];
+          const lgplaValues = (Array.isArray(items) ? items : [items])
+            .map((item: { LGPLA?: string }) => item.LGPLA)
+            .filter((val): val is string => Boolean(val));
+          setUbicaciones(lgplaValues);
+        }
+      } catch (error) {
+        console.error("Error fetching ubicaciones:", error);
+        setUbicaciones([]);
+      } finally {
+        setUbicacionesLoading(false);
+      }
+    };
+    fetchUbicaciones();
   }, [request.sapMaterial]);
 
   useEffect(() => {
@@ -170,6 +211,37 @@ export default function MaterialRequestCard({ request }: MaterialRequestCardProp
           <Typography variant="body2" color="text.secondary">
             {request.area}
           </Typography>
+        </Box>
+
+        {/* LGPLA Ubicaciones */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0.5,
+            mt: 1,
+            flexWrap: "wrap",
+            bgcolor: "#e8f5e9",
+            p: 1,
+            borderRadius: 1,
+          }}
+        >
+          <Place sx={{ fontSize: 20, color: "success.main" }} />
+          {ubicacionesLoading ? (
+            <Typography variant="body1" color="text.secondary">...</Typography>
+          ) : ubicaciones.length > 0 ? (
+            ubicaciones.map((lgpla, index) => (
+              <Chip
+                key={index}
+                label={lgpla}
+                size="medium"
+                color="success"
+                sx={{ fontSize: "0.9rem", fontWeight: "bold" }}
+              />
+            ))
+          ) : (
+            <Typography variant="body1" color="text.secondary">Sin ubicaciones</Typography>
+          )}
         </Box>
 
         {/* Quantity and Timer Row */}
