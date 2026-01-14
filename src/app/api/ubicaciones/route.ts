@@ -13,16 +13,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'SAP material required' }, { status: 400 });
     }
 
-    const response = await fetch(`http://${API_ADDRESS}:${API_PORT}/getUbicacionesVULMaterial`, {
+    const response = await fetch(`http://${API_ADDRESS}:${API_PORT}/MESMaterialSearch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        estacion: ESTACION,
+        plant: '5210',
         material: sapMaterial,
-        process: '',
-        user_id: '',
+
       }),
     });
 
